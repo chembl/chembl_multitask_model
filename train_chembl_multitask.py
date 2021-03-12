@@ -5,7 +5,6 @@ from torch.utils.data import DataLoader
 import torch.utils.data as D
 import pytorch_lightning as pl
 import tables as tb
-from collections import OrderedDict
 from sklearn.metrics import (
     matthews_corrcoef,
     confusion_matrix,
@@ -24,7 +23,7 @@ PATH = "."
 DATA_FILE = f"mt_data_{CHEMBL_VERSION}.h5"
 N_WORKERS = 6  # prefetches data in parallel to have batches ready for traning
 BATCH_SIZE = 32  # https://twitter.com/ylecun/status/989610208497360896
-LR = 5  # Learning rate. Big value because of the way we are weighting the targets
+LR = 4  # Learning rate. Big value because of the way we are weighting the targets
 FP_SIZE = 1024
 
 
@@ -123,18 +122,15 @@ class ChEMBLMultiTask(pl.LightningModule):
         mcc = matthews_corrcoef(y, y_hat)
         auc = roc_auc_score(y, y_hat_proba)
 
-        output = OrderedDict(
-            {
-                "test_acc": torch.tensor(acc),
-                "test_sens": torch.tensor(sens),
-                "test_spec": torch.tensor(spec),
-                "test_prec": torch.tensor(prec),
-                "test_f1": torch.tensor(f1),
-                "test_mcc": torch.tensor(mcc),
-                "test_auc": torch.tensor(auc),
-            }
-        )
-        return output
+        return {
+            "test_acc": torch.tensor(acc),
+            "test_sens": torch.tensor(sens),
+            "test_spec": torch.tensor(spec),
+            "test_prec": torch.tensor(prec),
+            "test_f1": torch.tensor(f1),
+            "test_mcc": torch.tensor(mcc),
+            "test_auc": torch.tensor(auc),
+        }
 
 
 if __name__ == "__main__":
@@ -162,7 +158,7 @@ if __name__ == "__main__":
         )
 
         model = ChEMBLMultiTask(len(weights), weights)
-        trainer = pl.Trainer(max_epochs=2)
+        trainer = pl.Trainer(max_epochs=3)
         trainer.fit(model, train_dataloader=train_loader)
         results.append(trainer.test(test_dataloaders=test_loader))
 
@@ -173,8 +169,7 @@ if __name__ == "__main__":
     for itemset in results:
         sums.update(itemset)
         counters.update(itemset.keys())
-
-    performance = {x: float(sums[x])/counters[x] for x in sums.keys()}
+    performance = {x: float(sums[x]) / counters[x] for x in sums.keys()}
     with open(f"performance_{CHEMBL_VERSION}.json", "w") as f:
         json.dump(performance, f)
 
@@ -188,7 +183,7 @@ if __name__ == "__main__":
     )
 
     model = ChEMBLMultiTask(len(weights), weights)
-    trainer = pl.Trainer(max_epochs=2)
+    trainer = pl.Trainer(max_epochs=3)
     trainer.fit(model, train_dataloader=final_train_loader)
     model.to_onnx(
         f"./chembl_{CHEMBL_VERSION}_multitask.onnx",
