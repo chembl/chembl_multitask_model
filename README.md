@@ -12,7 +12,6 @@ import onnxruntime
 import numpy as np
 from rdkit import Chem
 from rdkit.Chem import rdMolDescriptors
-import json
 
 FP_SIZE = 1024
 RADIUS = 2
@@ -25,16 +24,13 @@ def calc_morgan_fp(smiles):
     Chem.DataStructs.ConvertToNumpyArray(fp, a)
     return a
 
-def format_preds(preds):
+def format_preds(preds, targets):
     preds = np.concatenate(preds).ravel()
     np_preds = [(tar, pre) for tar, pre in zip(targets, preds)]
     dt = [('chembl_id','|U20'), ('pred', '<f4')]
     np_preds = np.array(np_preds, dtype=dt)
     np_preds[::-1].sort(order='pred')
     return np_preds
-
-with open('targets_28.json') as json_file:
-    targets = json.load(json_file)
 
 # load the model
 ort_session = onnxruntime.InferenceSession("chembl_28_multitask.onnx")
@@ -48,15 +44,5 @@ ort_inputs = {ort_session.get_inputs()[0].name: descs}
 preds = ort_session.run(None, ort_inputs)
 
 # example of how the output of the model can be formatted
-preds = format_preds(preds)
-preds
-
-array([('CHEMBL1163101', 0.97411716), ('CHEMBL1983', 0.9567785 ),
-       ('CHEMBL4068', 0.9555353 ), ('CHEMBL4427', 0.9475912 ),
-       ('CHEMBL2954', 0.9474703 ), ('CHEMBL4303', 0.93399465),
-       ('CHEMBL3959', 0.93018764), ('CHEMBL5441', 0.9279458 ),
-       ('CHEMBL313', 0.92713475), ('CHEMBL4296', 0.91438127),
-       ('CHEMBL4616', 0.90646756), ('CHEMBL6141', 0.9001103 ),
-       ('CHEMBL4561', 0.8965951 ), ('CHEMBL1980', 0.8889245 ),
-       ...
+preds = format_preds(preds, [o.name for o in ort_session.get_outputs()])
 ```

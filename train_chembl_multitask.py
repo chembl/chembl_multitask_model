@@ -185,8 +185,14 @@ if __name__ == "__main__":
     model = ChEMBLMultiTask(len(weights), weights)
     trainer = pl.Trainer(max_epochs=3)
     trainer.fit(model, train_dataloader=final_train_loader)
+
+    with tb.open_file(f"mt_data_{CHEMBL_VERSION}.h5", mode="r") as t_file:
+        output_names = t_file.root.target_chembl_ids[:]
+
     model.to_onnx(
         f"./chembl_{CHEMBL_VERSION}_multitask.onnx",
         torch.ones(FP_SIZE),
         export_params=True,
+        input_names=['input'],
+        output_names=output_names
     )
