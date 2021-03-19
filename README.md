@@ -11,6 +11,7 @@ The model is exported to the ONNX format so it can be used in any programming la
 import onnxruntime
 import numpy as np
 from rdkit import Chem
+from rdkit.Chem import rdMolDescriptors
 import json
 
 FP_SIZE = 1024
@@ -18,7 +19,7 @@ RADIUS = 2
 
 def calc_morgan_fp(smiles):
     mol = Chem.MolFromSmiles(smiles)
-    fp = Chem.rdMolDescriptors.GetMorganFingerprintAsBitVect(
+    fp = rdMolDescriptors.GetMorganFingerprintAsBitVect(
         mol, RADIUS, nBits=FP_SIZE)
     a = np.zeros((0,), dtype=np.float32)
     Chem.DataStructs.ConvertToNumpyArray(fp, a)
