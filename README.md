@@ -46,3 +46,7 @@ preds = ort_session.run(None, ort_inputs)
 # example of how the output of the model can be formatted
 preds = format_preds(preds, [o.name for o in ort_session.get_outputs()])
 ```
+
+# Run predictions on the browser!
+
+Using both RDKit Javascript MiniLib and ONNX.js, hosted in github pages: https://eloyfelix.github.io/rdkitjs_onnx_multitask
