@@ -18,7 +18,7 @@ from collections import Counter
 import json
 
 
-CHEMBL_VERSION = 28
+CHEMBL_VERSION = 29
 PATH = "."
 DATA_FILE = f"mt_data_{CHEMBL_VERSION}.h5"
 N_WORKERS = 6  # prefetches data in parallel to have batches ready for traning
@@ -91,6 +91,7 @@ class ChEMBLMultiTask(pl.LightningModule):
                 # the loss is the sum of all targets loss
                 # there are labeled samples for this target in this batch, so we add it's loss
                 loss += crit(logits[j][mask], labels[:, j][mask].view(-1, 1))
+        self.log("train_loss", loss, on_step=True, on_epoch=True, prog_bar=True)
         return loss
 
     def test_step(self, batch, batch_idx):
@@ -193,6 +194,6 @@ if __name__ == "__main__":
         f"./chembl_{CHEMBL_VERSION}_multitask.onnx",
         torch.ones(FP_SIZE),
         export_params=True,
-        input_names=['input'],
-        output_names=output_names
+        input_names=["input"],
+        output_names=output_names,
     )
