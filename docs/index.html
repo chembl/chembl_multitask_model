@@ -52,87 +52,84 @@
     <script src="https://cdn.jsdelivr.net/npm/vuetify@2.x/dist/vuetify.js"></script>
     <script src="https://unpkg.com/@rdkit/rdkit/Code/MinimalLib/dist/RDKit_minimal.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/onnxjs/dist/onnx.min.js"></script>
+
     <script>
-        window.initRDKitModule()
-            .then(function(RDKit) {
-                console.log("RDKit version: " + RDKit.version());
-                window.RDKit = RDKit;
-            })
-            .catch(() => {
-            });
-    </script>
-    <script>
-        new Vue({
-            vuetify: new Vuetify(),
-            el: '#app',
-            methods: {
-                predict: function (event) {
-                    if (this.smiles == "") {
-                        this.targets = []
-                        this.molSVG = ""
-                        return
-                    }
-                    var mol = window.RDKit.get_mol(this.smiles)
-                    if (mol.is_valid()) {
-                        var svg = mol.get_svg(480, 240);
-                        if (svg != "") {
-                            this.molSVG = svg
+        onRuntimeInitialized: initRDKitModule().then(function (instance) {
+            RDKitModule = instance
+
+            new Vue({
+                vuetify: new Vuetify(),
+                el: '#app',
+                methods: {
+                    predict: function (event) {
+                        if (this.smiles == "") {
+                            this.targets = []
+                            this.molSVG = ""
+                            return
                         }
-                        const fp = mol.get_morgan_fp(2, 1024)
-                        mol.delete()
+                        var mol = RDKitModule.get_mol(this.smiles)
+                        if (mol.is_valid()) {
+                            var svg = mol.get_svg(480, 240);
+                            if (svg != "") {
+                                this.molSVG = svg
+                            }
+                            const fp = mol.get_morgan_fp(2, 1024)
+                            mol.delete()
 
-                        const OnnxSession = new onnx.InferenceSession({ 'backendHint': 'cpu' })
-                        OnnxSession.loadModel("./chembl_29_multitask.onnx").then(() => {
-                            const descs = Float32Array.from(fp.split('').map(x => parseInt(x)))
-                            const tensor = new onnx.Tensor(descs, 'float32')
+                            const myOnnxSession = new onnx.InferenceSession({ 'backendHint': 'cpu' })
+                            myOnnxSession.loadModel("./chembl_29_multitask.onnx").then(() => {
+                                const descs = Float32Array.from(fp.split('').map(x => parseInt(x)))
+                                const tensor = new onnx.Tensor(descs, 'float32')
 
-                            OnnxSession.run([tensor]).then((output) => {
-                                var preds = [];
-                                for (let [target, pred] of output.entries()) {
-                                    preds.push({ chemblid: target, proba: pred.data[0] })
-                                }
-                                this.targets = preds;
+                                myOnnxSession.run([tensor]).then((output) => {
+                                    var preds = [];
+                                    for (let [target, pred] of output.entries()) {
+                                        preds.push({ chemblid: target, proba: pred.data[0] })
+                                    }
+                                    this.targets = preds;
+                                });
                             });
-                        });
-                    }
-                    else {
-                        this.molSVG = ""
-                        this.targets = []
-                    }
-                },
-                is_mol_valid: function () {
-                    var mol = window.RDKit.get_mol(this.smiles)
-                    const validmol = mol.is_valid()
-                    mol.delete()
-                    return validmol
-                },
-            },
-            data() {
-                return {
-                    sortBy: 'proba',
-                    sortDesc: true,
-                    search: "",
-                    molSVG: "",
-                    smiles: "CN(Cc1cnc2nc(N)nc(N)c2n1)c1ccc(C(=O)N[C@@H](CCC(=O)[O-])C(=O)[O-])cc1",
-                    headers: [
-                        {
-                            text: 'Target ChEMBL id',
-                            value: 'chemblid',
-                            align: 'left',
-                            sortable: false
-                        },
-                        { text: 'proba', value: 'proba' }
-                    ],
-                    targets: [],
-                    rules: {
-                        valid_mol: v => this.is_mol_valid(v) || "invalid SMILES",
+                        }
+                        else {
+                            this.molSVG = ""
+                            this.targets = []
+                        }
                     },
+                    is_mol_valid: function () {
+                        var mol = RDKitModule.get_mol(this.smiles)
+                        const validmol = mol.is_valid()
+                        mol.delete()
+                        return validmol
+                    },
+                },
+                data() {
+                    return {
+                        sortBy: 'proba',
+                        sortDesc: true,
+                        search: "",
+                        molSVG: "",
+                        smiles: "CN(Cc1cnc2nc(N)nc(N)c2n1)c1ccc(C(=O)N[C@@H](CCC(=O)[O-])C(=O)[O-])cc1",
+                        headers: [
+                            {
+                                text: 'Target ChEMBL id',
+                                value: 'chemblid',
+                                align: 'left',
+                                sortable: false
+                            },
+                            { text: 'proba', value: 'proba' }
+                        ],
+                        targets: [],
+                        rules: {
+                            valid_mol: v => this.is_mol_valid(v) || "invalid SMILES",
+                        },
+                    }
+                },
+                created: function () {
+                    this.predict()
                 }
-            },
-            created: function () {
-                this.predict()
-            }
+            })
         })
+
     </script>
 </body>
 
