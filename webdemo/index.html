@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta name="Author" content="Eloy Félix">
+    <link href="https://fonts.googleapis.com/css?family=Roboto:100,300,400,500,700,900" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/@mdi/font@4.x/css/materialdesignicons.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/vuetify@2.x/dist/vuetify.min.css" rel="stylesheet">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, minimal-ui">
+</head>
+
+<body>
+    <div id="app">
+        <v-app>
+            <v-main>
+                <v-container>
+                    <h1>Multitask Target prediction with RDKit MinimalLib (JS) and ONNX.js</h1>
+                    <div v-html="molSVG" style="text-align:center"></div>
+
+                    <v-text-field v-model="smiles" label="SMILES" outlined v-on:keyup="predict"
+                        :rules="[rules.valid_mol]"></v-text-field>
+
+                    <v-card>
+                        <v-card-title>
+                            Predictions
+                            <v-spacer></v-spacer>
+                            <v-text-field v-model="search" append-icon="mdi-magnify" label="Search" single-line
+                                hide-details>
+                            </v-text-field>
+                        </v-card-title>
+
+                        <v-data-table :headers="headers" :items="targets" item-key="chemblid" show-expand
+                            class="elevation-1" :search="search" :sort-by.sync="sortBy" :sort-desc.sync="sortDesc">
+                            <template v-slot:top>
+                            </template>
+                            <template v-slot:expanded-item="{ headers, item }">
+                                <td :colspan="headers.length">
+                                    <object
+                                        :data="'https://www.ebi.ac.uk/chembl/embed/#target_report_card/' + item.chemblid + '/name_and_classification'"
+                                        width="100%" height="620%"></object>
+                                </td>
+                            </template>
+                        </v-data-table>
+
+                    </v-card>
+                </v-container>
+            </v-main>
+        </v-app>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/vue@2.x/dist/vue.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vuetify@2.x/dist/vuetify.js"></script>
+    <script src="https://unpkg.com/@rdkit/rdkit/Code/MinimalLib/dist/RDKit_minimal.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/onnxjs/dist/onnx.min.js"></script>
+    <script>
+        window.initRDKitModule()
+            .then(function(RDKit) {
+                console.log("RDKit version: " + RDKit.version());
+                window.RDKit = RDKit;
+            })
+            .catch(() => {
+            });
+    </script>
+    <script>
+        new Vue({
+            vuetify: new Vuetify(),
+            el: '#app',
+            methods: {
+                predict: function (event) {
+                    if (this.smiles == "") {
+                        this.targets = []
+                        this.molSVG = ""
+                        return
+                    }
+                    var mol = window.RDKit.get_mol(this.smiles)
+                    if (mol.is_valid()) {
+                        var svg = mol.get_svg(480, 240);
+                        if (svg != "") {
+                            this.molSVG = svg
+                        }
+                        const fp = mol.get_morgan_fp(2, 1024)
+                        mol.delete()
+
+                        const OnnxSession = new onnx.InferenceSession({ 'backendHint': 'cpu' })
+                        OnnxSession.loadModel("./chembl_29_multitask.onnx").then(() => {
+                            const descs = Float32Array.from(fp.split('').map(x => parseInt(x)))
+                            const tensor = new onnx.Tensor(descs, 'float32')
+
+                            OnnxSession.run([tensor]).then((output) => {
+                                var preds = [];
+                                for (let [target, pred] of output.entries()) {
+                                    preds.push({ chemblid: target, proba: pred.data[0] })
+                                }
+                                this.targets = preds;
+                            });
+                        });
+                    }
+                    else {
+                        this.molSVG = ""
+                        this.targets = []
+                    }
+                },
+                is_mol_valid: function () {
+                    var mol = window.RDKit.get_mol(this.smiles)
+                    const validmol = mol.is_valid()
+                    mol.delete()
+                    return validmol
+                },
+            },
+            data() {
+                return {
+                    sortBy: 'proba',
+                    sortDesc: true,
+                    search: "",
+                    molSVG: "",
+                    smiles: "CN(Cc1cnc2nc(N)nc(N)c2n1)c1ccc(C(=O)N[C@@H](CCC(=O)[O-])C(=O)[O-])cc1",
+                    headers: [
+                        {
+                            text: 'Target ChEMBL id',
+                            value: 'chemblid',
+                            align: 'left',
+                            sortable: false
+                        },
+                        { text: 'proba', value: 'proba' }
+                    ],
+                    targets: [],
+                    rules: {
+                        valid_mol: v => this.is_mol_valid(v) || "invalid SMILES",
+                    },
+                }
+            },
+            created: function () {
+                this.predict()
+            }
+        })
+    </script>
+</body>
+
+</html>

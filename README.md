@@ -33,7 +33,7 @@ def format_preds(preds, targets):
     return np_preds
 
 # load the model
-ort_session = onnxruntime.InferenceSession("chembl_28_multitask.onnx")
+ort_session = onnxruntime.InferenceSession("chembl_29_multitask.onnx")
 
 # calculate the FPs
 smiles = 'CN(C)CCc1c[nH]c2ccc(C[C@H]3COC(=O)N3)cc12'
@@ -47,6 +47,6 @@ preds = ort_session.run(None, ort_inputs)
 preds = format_preds(preds, [o.name for o in ort_session.get_outputs()])
 ```
 
-# Run predictions on the browser!
+# Try it online!
 
-Using both RDKit Javascript MiniLib and ONNX.js, hosted in github pages: https://eloyfelix.github.io/rdkitjs_onnx_multitask
+Using both RDKit Javascript MinimalLib and ONNX.js. Hosted in github pages: https://chembl.github.io/chembl_multitask_model
