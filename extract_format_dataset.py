@@ -9,7 +9,7 @@ from tables.atom import ObjectAtom
 import json
 
 
-CHEMBL_VERSION = 28
+CHEMBL_VERSION = 29
 FP_SIZE = 1024
 RADIUS = 2
 # num of active and inactive different molecules needed to include a target
@@ -26,18 +26,15 @@ SELECT
   activities.standard_value            AS standard_value,
   molecule_hierarchy.parent_molregno   AS molregno,
   compound_structures.canonical_smiles AS canonical_smiles,
-  molecule_dictionary.chembl_id        AS chembl_id,
   target_dictionary.tid                AS tid,
   target_dictionary.chembl_id          AS target_chembl_id,
-  protein_family_classification.l1     AS l1,
-  protein_family_classification.l2     AS l2,
-  protein_family_classification.l3     AS l3
+  protein_classification.protein_class_desc     AS protein_class_desc
 FROM activities
   JOIN assays ON activities.assay_id = assays.assay_id
   JOIN target_dictionary ON assays.tid = target_dictionary.tid
   JOIN target_components ON target_dictionary.tid = target_components.tid
   JOIN component_class ON target_components.component_id = component_class.component_id
-  JOIN protein_family_classification ON component_class.protein_class_id = protein_family_classification.protein_class_id
+  JOIN protein_classification ON component_class.protein_class_id = protein_classification.protein_class_id
   JOIN molecule_dictionary ON activities.molregno = molecule_dictionary.molregno
   JOIN molecule_hierarchy ON molecule_dictionary.molregno = molecule_hierarchy.molregno
   JOIN compound_structures ON molecule_hierarchy.parent_molregno = compound_structures.molregno
@@ -75,20 +72,19 @@ def set_active(row):
     active = 0
     if row["standard_value"] <= 1000:
         active = 1
-    if row["l1"] == "Ion channel":
+    if "ion channel" in row["protein_class_desc"]:
         if row["standard_value"] <= 10000:
             active = 1
-    if row["l2"] == "Kinase":
+    if "enzyme  kinase  protein kinase" in row["protein_class_desc"]:
         if row["standard_value"] > 30:
             active = 0
-    if row["l2"] == "Nuclear receptor":
+    if "transcription factor  nuclear receptor" in row["protein_class_desc"]:
         if row["standard_value"] > 100:
             active = 0
-    if row["l3"] and "GPCR" in row["l3"]:
+    if "membrane receptor  7tm" in row["protein_class_desc"]:
         if row["standard_value"] > 100:
             active = 0
     return active
-
 
 df["active"] = df.apply(lambda row: set_active(row), axis=1)
 
@@ -115,11 +111,17 @@ docs = docs[docs["doc_id"] >= 2.0].reset_index()["target_chembl_id"]
 t_keep = set(acts).intersection(set(inacts)).intersection(set(docs))
 activities = df[df["target_chembl_id"].isin(t_keep)]
 
-ion = pd.unique(activities[activities["l1"] == "Ion channel"]["tid"]).shape[0]
-kin = pd.unique(activities[activities["l2"] == "Kinase"]["tid"]).shape[0]
-nuc = pd.unique(activities[activities["l2"] == "Nuclear receptor"]["tid"]).shape[0]
+ion = pd.unique(
+    activities[activities["protein_class_desc"].str.contains("ion channel", na=False)]["tid"]
+).shape[0]
+kin = pd.unique(
+    activities[activities["protein_class_desc"].str.contains("enzyme  kinase  protein kinase", na=False)]["tid"]
+).shape[0]
+nuc = pd.unique(
+    activities[activities["protein_class_desc"].str.contains("transcription factor  nuclear receptor", na=False)]["tid"]
+).shape[0]
 gpcr = pd.unique(
-    activities[activities["l3"].str.contains("GPCR", na=False)]["tid"]
+    activities[activities["protein_class_desc"].str.contains("membrane receptor  7tm", na=False)]["tid"]
 ).shape[0]
 
 print("Number of unique targets: ", len(t_keep))
@@ -139,27 +141,23 @@ activities.to_csv(f"chembl_{CHEMBL_VERSION}_activity_data_filtered.csv", index=F
 #     known no-active = 0
 #     unknown activity = -1, so we'll be able to easilly filter them and won't be taken into account when calculating the loss during model training.
 
-# The matrix is extremely sparse so using sparse matrices (COO/CSR/CSC) should be considered. There are a couple of issues making it a bit tricker than what it should be so we'll keep the example without them.
+# The matrix is extremely sparse so using sparse matrices (COO/CSR/CSC) should be considered.
 #     https://github.com/pytorch/pytorch/issues/20248
-#     https://github.com/scipy/scipy/issues/7531
-
 
 def gen_dict(group):
     return {tid: act for tid, act in zip(group["target_chembl_id"], group["active"])}
 
-
-group = activities.groupby("chembl_id")
+group = activities.groupby("molregno")
 temp = pd.DataFrame(group.apply(gen_dict))
 mt_df = pd.DataFrame(temp[0].tolist())
-mt_df["chembl_id"] = temp.index
+mt_df["molregno"] = temp.index
 mt_df = mt_df.where((pd.notnull(mt_df)), -1)
 
-
-structs = activities[["chembl_id", "canonical_smiles"]].drop_duplicates(
-    subset="chembl_id"
+structs = activities[["molregno", "canonical_smiles"]].drop_duplicates(
+    subset="molregno"
 )
 
-# drop mols not sanitizing on rdkit
+# drop mols not sanitizing in rdkit
 structs["romol"] = structs.apply(
     lambda row: Chem.MolFromSmiles(row["canonical_smiles"]), axis=1
 )
@@ -167,7 +165,7 @@ structs = structs.dropna()
 del structs["romol"]
 
 # add the structures to the final df
-mt_df = pd.merge(structs, mt_df, how="inner", on="chembl_id")
+mt_df = pd.merge(structs, mt_df, how="inner", on="molregno")
 
 # save df to csv
 mt_df.to_csv(f"chembl_{CHEMBL_VERSION}_multi_task_data.csv", index=False)
@@ -185,7 +183,6 @@ def calc_fp(smiles, fp_size, radius):
     Chem.DataStructs.ConvertToNumpyArray(fp, a)
     return a
 
-
 # calc fps
 descs = [calc_fp(smi, FP_SIZE, RADIUS) for smi in mt_df["canonical_smiles"].values]
 descs = np.asarray(descs, dtype=np.float32)
@@ -196,10 +193,10 @@ with tb.open_file(f"mt_data_{CHEMBL_VERSION}.h5", mode="w") as t_file:
     # set compression filter. It will make the file much smaller
     filters = tb.Filters(complib="blosc", complevel=5)
 
-    # save chembl_ids
+    # save molregnos
     tatom = ObjectAtom()
-    cids = t_file.create_vlarray(t_file.root, "chembl_ids", atom=tatom)
-    for cid in mt_df["chembl_id"].values:
+    cids = t_file.create_vlarray(t_file.root, "molregnos", atom=tatom)
+    for cid in mt_df["molregno"].values:
         cids.append(cid)
 
     # save fps
@@ -207,10 +204,11 @@ with tb.open_file(f"mt_data_{CHEMBL_VERSION}.h5", mode="w") as t_file:
     fps = t_file.create_carray(t_file.root, "fps", fatom, descs.shape, filters=filters)
     fps[:] = descs
 
-    del mt_df["chembl_id"]
+    del mt_df["molregno"]
     del mt_df["canonical_smiles"]
 
     # save target chembl ids
+    tatom = ObjectAtom()
     tcids = t_file.create_vlarray(t_file.root, "target_chembl_ids", atom=tatom)
     for tcid in mt_df.columns.values:
         tcids.append(tcid)
@@ -235,7 +233,7 @@ with tb.open_file(f"mt_data_{CHEMBL_VERSION}.h5", mode="w") as t_file:
 
 # Open H5 file and show the shape of all collections
 with tb.open_file(f"mt_data_{CHEMBL_VERSION}.h5", mode="r") as t_file:
-    print(t_file.root.chembl_ids.shape)
+    print(t_file.root.molregnos.shape)
     print(t_file.root.target_chembl_ids.shape)
     print(t_file.root.fps.shape)
     print(t_file.root.labels.shape)

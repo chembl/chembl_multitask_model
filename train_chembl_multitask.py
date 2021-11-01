@@ -18,7 +18,7 @@ from collections import Counter
 import json
 
 
-CHEMBL_VERSION = 28
+CHEMBL_VERSION = 29
 PATH = "."
 DATA_FILE = f"mt_data_{CHEMBL_VERSION}.h5"
 N_WORKERS = 6  # prefetches data in parallel to have batches ready for traning
@@ -91,6 +91,7 @@ class ChEMBLMultiTask(pl.LightningModule):
                 # the loss is the sum of all targets loss
                 # there are labeled samples for this target in this batch, so we add it's loss
                 loss += crit(logits[j][mask], labels[:, j][mask].view(-1, 1))
+        self.log("train_loss", loss, on_step=True, on_epoch=True, prog_bar=True)
         return loss
 
     def test_step(self, batch, batch_idx):
@@ -122,7 +123,7 @@ class ChEMBLMultiTask(pl.LightningModule):
         mcc = matthews_corrcoef(y, y_hat)
         auc = roc_auc_score(y, y_hat_proba)
 
-        return {
+        metrics =  {
             "test_acc": torch.tensor(acc),
             "test_sens": torch.tensor(sens),
             "test_spec": torch.tensor(spec),
@@ -131,7 +132,17 @@ class ChEMBLMultiTask(pl.LightningModule):
             "test_mcc": torch.tensor(mcc),
             "test_auc": torch.tensor(auc),
         }
+        self.log_dict(metrics)
+        return metrics
 
+    def test_epoch_end(self, outputs):
+        sums = Counter()
+        counters = Counter()
+        for itemset in outputs:
+            sums.update(itemset)
+            counters.update(itemset.keys())
+        metrics = {x: float(sums[x]) / counters[x] for x in sums.keys()}
+        return metrics
 
 if __name__ == "__main__":
 
@@ -143,7 +154,7 @@ if __name__ == "__main__":
     dataset = ChEMBLDataset(f"{PATH}/{DATA_FILE}")
     indices = list(range(len(dataset)))
 
-    results = []
+    metrics = []
     kfold = KFold(n_splits=5, shuffle=True)
     for train_idx, test_idx in kfold.split(indices):
         train_sampler = D.sampler.SubsetRandomSampler(train_idx)
@@ -159,14 +170,15 @@ if __name__ == "__main__":
 
         model = ChEMBLMultiTask(len(weights), weights)
         trainer = pl.Trainer(max_epochs=3)
-        trainer.fit(model, train_dataloader=train_loader)
-        results.append(trainer.test(test_dataloaders=test_loader))
+        trainer.fit(model, train_dataloaders=train_loader)
+        mm = trainer.test(dataloaders=test_loader)
+        metrics.append(mm)
 
-    # average folds performance
-    results = [item for sublist in results for item in sublist]
+    # average folds metrics
+    metrics = [item for sublist in metrics for item in sublist]
     sums = Counter()
     counters = Counter()
-    for itemset in results:
+    for itemset in metrics:
         sums.update(itemset)
         counters.update(itemset.keys())
     performance = {x: float(sums[x]) / counters[x] for x in sums.keys()}
@@ -184,7 +196,7 @@ if __name__ == "__main__":
 
     model = ChEMBLMultiTask(len(weights), weights)
     trainer = pl.Trainer(max_epochs=3)
-    trainer.fit(model, train_dataloader=final_train_loader)
+    trainer.fit(model, train_dataloaders=final_train_loader)
 
     with tb.open_file(f"mt_data_{CHEMBL_VERSION}.h5", mode="r") as t_file:
         output_names = t_file.root.target_chembl_ids[:]
@@ -193,6 +205,6 @@ if __name__ == "__main__":
         f"./chembl_{CHEMBL_VERSION}_multitask.onnx",
         torch.ones(FP_SIZE),
         export_params=True,
-        input_names=['input'],
-        output_names=output_names
+        input_names=["input"],
+        output_names=output_names,
     )
