@@ -47,6 +47,10 @@ preds = ort_session.run(None, ort_inputs)
 preds = format_preds(preds, [o.name for o in ort_session.get_outputs()])
 ```
 
+# C++ REST microservice
+
+https://github.com/eloyfelix/pistache_predictor
+
 # Try it online!
 
 Using both RDKit Javascript MinimalLib and ONNX.js. Hosted in github pages: https://chembl.github.io/chembl_multitask_model
