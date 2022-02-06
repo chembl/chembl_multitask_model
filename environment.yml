@@ -1,0 +1,12 @@
+name: multitask-network
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - pandas=1.4.0
+  - pytables=3.6.1
+  - python=3.9.7
+  - pytorch-lightning=1.5.9
+  - rdkit=2021.09.4
+  - scikit-learn=1.0.2
+  - sqlalchemy=1.4.31

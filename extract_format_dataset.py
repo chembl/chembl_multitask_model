@@ -45,12 +45,8 @@ WHERE activities.standard_units = 'nM' AND
       activities.potential_duplicate = 0 AND assays.confidence_score >= 8 AND
       target_dictionary.target_type = 'SINGLE PROTEIN'"""
 
-with engine.begin() as conn:
-    res = conn.execute(text(qtext))
-    df = pd.DataFrame(res.fetchall())
-
-df.columns = res.keys()
-df = df.where((pd.notnull(df)), None)
+with engine.connect() as conn:
+    df = pd.read_sql(text(qtext), conn)
 
 # Drop duplicate activities keeping the activity with lower concentration for each molecule-target pair
 df = df.sort_values(by=["standard_value", "molregno", "tid"], ascending=True)
@@ -139,9 +135,9 @@ activities.to_csv(f"chembl_{CHEMBL_VERSION}_activity_data_filtered.csv", index=F
 # Prepare the label matrix for the multi-task deep neural network
 #     known active = 1
 #     known no-active = 0
-#     unknown activity = -1, so we'll be able to easilly filter them and won't be taken into account when calculating the loss during model training.
+#     unknown activity = -1, easy to filter out when calculating the loss during model training
 
-# The matrix is extremely sparse so using sparse matrices (COO/CSR/CSC) should be considered.
+# The matrix is extremely sparse so using sparse matrices (COO/CSR/CSC) should be considered
 #     https://github.com/pytorch/pytorch/issues/20248
 
 def gen_dict(group):
@@ -158,9 +154,7 @@ structs = activities[["molregno", "canonical_smiles"]].drop_duplicates(
 )
 
 # drop mols not sanitizing in rdkit
-structs["romol"] = structs.apply(
-    lambda row: Chem.MolFromSmiles(row["canonical_smiles"]), axis=1
-)
+structs["romol"] = structs["canonical_smiles"].apply(Chem.MolFromSmiles)
 structs = structs.dropna()
 del structs["romol"]
 
