@@ -77,7 +77,7 @@
                             mol.delete()
 
                             const myOnnxSession = new onnx.InferenceSession({ 'backendHint': 'cpu' })
-                            myOnnxSession.loadModel("./chembl_29_multitask.onnx").then(() => {
+                            myOnnxSession.loadModel("./chembl_30_multitask.onnx").then(() => {
                                 const descs = Float32Array.from(fp.split('').map(x => parseInt(x)))
                                 const tensor = new onnx.Tensor(descs, 'float32')
 

@@ -18,7 +18,7 @@ from collections import Counter
 import json
 
 
-CHEMBL_VERSION = 29
+CHEMBL_VERSION = 30
 PATH = "."
 DATA_FILE = f"mt_data_{CHEMBL_VERSION}.h5"
 N_WORKERS = 6  # prefetches data in parallel to have batches ready for traning
