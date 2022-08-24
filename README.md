@@ -33,7 +33,7 @@ def format_preds(preds, targets):
     return np_preds
 
 # load the model
-ort_session = onnxruntime.InferenceSession("chembl_30_multitask.onnx")
+ort_session = onnxruntime.InferenceSession("chembl_31_multitask.onnx")
 
 # calculate the FPs
 smiles = 'CN(C)CCc1c[nH]c2ccc(C[C@H]3COC(=O)N3)cc12'
