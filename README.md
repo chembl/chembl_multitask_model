@@ -47,6 +47,39 @@ preds = ort_session.run(None, ort_inputs)
 preds = format_preds(preds, [o.name for o in ort_session.get_outputs()])
 ```
 
+# In Julia using [RDKitMinimalLib](https://github.com/eloyfelix/RDKitMinimalLib.jl) and [ONNX](https://github.com/FluxML/ONNX.jl)
+
+```julia
+import RDKitMinimalLib: get_mol, get_morgan_fp
+import Umlaut: play!
+import ONNX
+import JSON
+
+path = "chembl_31_multitask.onnx"
+targets = JSON.parsefile("targets_31.json")
+
+# dummy input
+dummy = rand(Float32, 1024, 1)
+# load the model
+mt_chembl = ONNX.load(path, dummy)
+
+# load molecule and calc morgan fingerprint
+mol = get_mol("CC(=O)Oc1ccccc1C(=O)O")
+fp_details = Dict{String, Any}("nBits" => 1024, "radius" => 2)
+mfp = get_morgan_fp(mol, fp_details)
+
+# convert the bitstring to a 1024×1 Matrix{Float32}
+mfp = map(x->parse(Float32,string(x)),collect(mfp))
+mfp = reshape(mfp, (length(mfp), 1))
+
+# test a molecule
+pred = play!(mt_chembl, mfp)
+pred = collect(Iterators.flatten(pred))
+
+res = tuple.(targets, pred)
+res = sort(res, by=res->res[2], rev=true)
+```
+
 # C++ REST microservice
 
 https://github.com/eloyfelix/pistache_predictor
