@@ -47,7 +47,7 @@ preds = ort_session.run(None, ort_inputs)
 preds = format_preds(preds, [o.name for o in ort_session.get_outputs()])
 ```
 
-# In Julia using [RDKitMinimalLib](https://github.com/eloyfelix/RDKitMinimalLib.jl) and [ONNX](https://github.com/FluxML/ONNX.jl)
+# In Julia using [RDKitMinimalLib.jl](https://github.com/eloyfelix/RDKitMinimalLib.jl) and [ONNX.jl](https://github.com/FluxML/ONNX.jl)
 
 ```julia
 import RDKitMinimalLib: get_mol, get_morgan_fp
