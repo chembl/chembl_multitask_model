@@ -4,9 +4,9 @@ channels:
   - defaults
 dependencies:
   - pandas=1.4.0
-  - pytables=3.6.1
+  - pytables=3.7
   - python=3.9.7
-  - pytorch-lightning=1.5.9
-  - rdkit=2021.09.4
+  - pytorch-lightning=1.8
+  - rdkit=2022.09.2
   - scikit-learn=1.0.2
-  - sqlalchemy=1.4.31
+  - sqlalchemy~=1.4
