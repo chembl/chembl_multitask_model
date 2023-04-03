@@ -72,13 +72,13 @@ def set_active(row):
         if row["standard_value"] <= 10000:
             active = 1
     if "enzyme  kinase  protein kinase" in row["protein_class_desc"]:
-        if row["standard_value"] > 30:
+        if row["standard_value"] is not pd.NA and row["standard_value"] > 30:
             active = 0
     if "transcription factor  nuclear receptor" in row["protein_class_desc"]:
-        if row["standard_value"] > 100:
+        if row["standard_value"] is not pd.NA and row["standard_value"] > 100:
             active = 0
     if "membrane receptor  7tm" in row["protein_class_desc"]:
-        if row["standard_value"] > 100:
+        if row["standard_value"] is not pd.NA and row["standard_value"] > 100:
             active = 0
     return active
 
