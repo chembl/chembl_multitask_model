@@ -10,3 +10,4 @@ dependencies:
   - rdkit=2022.09.5
   - scikit-learn=1.2.2
   - sqlalchemy>=2.0
+  - pyarrow=11.0.0

@@ -66,7 +66,7 @@ df.to_csv(f"chembl_{CHEMBL_VERSION}_activity_data.csv", index=False)
 #         Non-IDG Family Targets: <= 1μM
 def set_active(row):
     active = 0
-    if row["standard_value"] <= 1000:
+    if row["standard_value"] is not pd.NA and row["standard_value"] <= 1000:
         active = 1
     if "ion channel" in row["protein_class_desc"]:
         if row["standard_value"] <= 10000:
