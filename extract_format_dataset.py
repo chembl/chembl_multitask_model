@@ -69,7 +69,7 @@ def set_active(row):
     if row["standard_value"] is not pd.NA and row["standard_value"] <= 1000:
         active = 1
     if "ion channel" in row["protein_class_desc"]:
-        if row["standard_value"] <= 10000:
+        row["standard_value"] is not pd.NA and if row["standard_value"] <= 10000:
             active = 1
     if "enzyme  kinase  protein kinase" in row["protein_class_desc"]:
         if row["standard_value"] is not pd.NA and row["standard_value"] > 30:
