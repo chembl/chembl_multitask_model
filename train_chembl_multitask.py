@@ -57,6 +57,7 @@ class ChEMBLMultiTask(pl.LightningModule):
         self.fc1 = nn.Linear(FP_SIZE, 2000)
         self.fc2 = nn.Linear(2000, 100)
         self.dropout = nn.Dropout(0.25)
+        self.test_step_outputs = []
 
         # add an independent output for each task in the output layer
         for n_m in range(n_tasks):
@@ -133,12 +134,13 @@ class ChEMBLMultiTask(pl.LightningModule):
             "test_auc": torch.tensor(auc),
         }
         self.log_dict(metrics)
+        self.test_step_outputs.append(metrics)
         return metrics
 
-    def test_epoch_end(self, outputs):
+    def on_test_epoch_end(self):
         sums = Counter()
         counters = Counter()
-        for itemset in outputs:
+        for itemset in self.test_step_outputs:
             sums.update(itemset)
             counters.update(itemset.keys())
         metrics = {x: float(sums[x]) / counters[x] for x in sums.keys()}

@@ -46,7 +46,7 @@ WHERE activities.standard_units = 'nM' AND
       target_dictionary.target_type = 'SINGLE PROTEIN'"""
 
 with engine.connect() as conn:
-    df = pd.read_sql(text(qtext), conn)
+    df = pd.read_sql(text(qtext), conn, dtype_backend="pyarrow")
 
 # Drop duplicate activities keeping the activity with lower concentration for each molecule-target pair
 df = df.sort_values(by=["standard_value", "molregno", "tid"], ascending=True)
