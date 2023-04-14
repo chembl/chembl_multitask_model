@@ -171,7 +171,9 @@ if __name__ == "__main__":
         )
 
         model = ChEMBLMultiTask(len(weights), weights)
-        trainer = pl.Trainer(max_epochs=3)
+
+        # this shallow model trains quicker in CPU
+        trainer = pl.Trainer(max_epochs=3, accelerator="cpu")
         trainer.fit(model, train_dataloaders=train_loader)
         mm = trainer.test(dataloaders=test_loader)
         metrics.append(mm)
@@ -197,7 +199,9 @@ if __name__ == "__main__":
     )
 
     model = ChEMBLMultiTask(len(weights), weights)
-    trainer = pl.Trainer(max_epochs=3)
+
+    # this shallow model trains quicker in CPU
+    trainer = pl.Trainer(max_epochs=3, accelerator="cpu")
     trainer.fit(model, train_dataloaders=final_train_loader)
 
     with tb.open_file(f"mt_data_{CHEMBL_VERSION}.h5", mode="r") as t_file:
