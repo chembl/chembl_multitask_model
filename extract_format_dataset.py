@@ -46,7 +46,7 @@ WHERE activities.standard_units = 'nM' AND
       target_dictionary.target_type = 'SINGLE PROTEIN'"""
 
 with engine.connect() as conn:
-    df = pd.read_sql(text(qtext), conn)
+    df = pd.read_sql(text(qtext), conn, dtype_backend="pyarrow")
 
 # Drop duplicate activities keeping the activity with lower concentration for each molecule-target pair
 df = df.sort_values(by=["standard_value", "molregno", "tid"], ascending=True)
@@ -66,19 +66,19 @@ df.to_csv(f"chembl_{CHEMBL_VERSION}_activity_data.csv", index=False)
 #         Non-IDG Family Targets: <= 1μM
 def set_active(row):
     active = 0
-    if row["standard_value"] <= 1000:
+    if row["standard_value"] is not pd.NA and row["standard_value"] <= 1000:
         active = 1
     if "ion channel" in row["protein_class_desc"]:
-        if row["standard_value"] <= 10000:
+        if row["standard_value"] is not pd.NA and row["standard_value"] <= 10000:
             active = 1
     if "enzyme  kinase  protein kinase" in row["protein_class_desc"]:
-        if row["standard_value"] > 30:
+        if row["standard_value"] is not pd.NA and row["standard_value"] > 30:
             active = 0
     if "transcription factor  nuclear receptor" in row["protein_class_desc"]:
-        if row["standard_value"] > 100:
+        if row["standard_value"] is not pd.NA and row["standard_value"] > 100:
             active = 0
     if "membrane receptor  7tm" in row["protein_class_desc"]:
-        if row["standard_value"] > 100:
+        if row["standard_value"] is not pd.NA and row["standard_value"] > 100:
             active = 0
     return active
 
