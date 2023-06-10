@@ -9,7 +9,7 @@ from tables.atom import ObjectAtom
 import json
 
 
-CHEMBL_VERSION = 32
+CHEMBL_VERSION = 33
 FP_SIZE = 1024
 RADIUS = 2
 # num of active and inactive different molecules needed to include a target
