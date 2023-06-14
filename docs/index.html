@@ -73,11 +73,11 @@
                             if (svg != "") {
                                 this.molSVG = svg
                             }
-                            const fp = mol.get_morgan_fp(2, 1024)
+                            const fp = mol.get_morgan_fp(JSON.stringify({ radius: 2, nBits: 1024 }))
                             mol.delete()
 
                             const myOnnxSession = new onnx.InferenceSession({ 'backendHint': 'cpu' })
-                            myOnnxSession.loadModel("./chembl_31_multitask.onnx").then(() => {
+                            myOnnxSession.loadModel("./chembl_33_multitask_q8.onnx").then(() => {
                                 const descs = Float32Array.from(fp.split('').map(x => parseInt(x)))
                                 const tensor = new onnx.Tensor(descs, 'float32')
 
