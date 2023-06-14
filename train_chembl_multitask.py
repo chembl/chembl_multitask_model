@@ -1,4 +1,4 @@
-from onnxruntime.quantization import quantize_dynamic, QuantType
+from onnxruntime.quantization import quantize_dynamic
 import onnx
 import torch
 from torch import nn
