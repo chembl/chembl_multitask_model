@@ -1,3 +1,5 @@
+from onnxruntime.quantization import quantize_dynamic, QuantType
+import onnx
 import torch
 from torch import nn
 import torch.nn.functional as F
@@ -214,3 +216,7 @@ if __name__ == "__main__":
         input_names=["input"],
         output_names=output_names,
     )
+
+    model_fp32 = f"./chembl_{CHEMBL_VERSION}_multitask.onnx",
+    model_quant = f"./chembl_{CHEMBL_VERSION}_multitask_q8.onnx",
+    quantized_model = quantize_dynamic(model_fp32, model_quant)
