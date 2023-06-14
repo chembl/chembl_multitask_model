@@ -51,7 +51,7 @@
     <script src="https://cdn.jsdelivr.net/npm/vue@2.x/dist/vue.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/vuetify@2.x/dist/vuetify.js"></script>
     <script src="https://unpkg.com/@rdkit/rdkit/Code/MinimalLib/dist/RDKit_minimal.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/onnxjs/dist/onnx.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/ort.min.js"></script>
 
     <script>
         onRuntimeInitialized: initRDKitModule().then(function (instance) {
@@ -61,7 +61,7 @@
                 vuetify: new Vuetify(),
                 el: '#app',
                 methods: {
-                    predict: function (event) {
+                    predict: async function (event) {
                         if (this.smiles == "") {
                             this.targets = []
                             this.molSVG = ""
@@ -76,19 +76,21 @@
                             const fp = mol.get_morgan_fp(JSON.stringify({ radius: 2, nBits: 1024 }))
                             mol.delete()
 
-                            const myOnnxSession = new onnx.InferenceSession({ 'backendHint': 'cpu' })
-                            myOnnxSession.loadModel("./chembl_33_multitask.onnx").then(() => {
-                                const descs = Float32Array.from(fp.split('').map(x => parseInt(x)))
-                                const tensor = new onnx.Tensor(descs, 'float32')
+                            const session = await ort.InferenceSession.create(
+                                "./chembl_33_multitask_q8.onnx",
+                                {
+                                    executionProviders: ["cpu"],
+                                }
+                            );
+                            const descs = Float32Array.from(fp.split('').map(x => parseInt(x)))
+                            const tensor = new ort.Tensor('float32', descs);
 
-                                myOnnxSession.run([tensor]).then((output) => {
-                                    var preds = [];
-                                    for (let [target, pred] of output.entries()) {
-                                        preds.push({ chemblid: target, proba: pred.data[0] })
-                                    }
-                                    this.targets = preds;
-                                });
-                            });
+                            const results = await session.run({ 'input': tensor });
+                            var preds = [];
+                            for (let [target, pred] of Object.entries(results)) {
+                                preds.push({ chemblid: target, proba: pred.data[0] })
+                            }
+                            this.targets = preds;
                         }
                         else {
                             this.molSVG = ""
