@@ -1,5 +1,7 @@
 # ChEMBL Multitask Nerual Network model
 
+Small and fast target prediction model trained on a panel of targets using ChEMBL data. The model can be used in off-target prediction scenarios with large collections of compounds. 
+
 - Based on the blogpost: http://chembl.blogspot.com/2019/05/multi-task-neural-network-on-chembl.html
 - Model available in KNIME thanks to Greg Landrum: https://www.knime.com/blog/interactive-bioactivity-prediction-with-multitask-neural-networks
 
