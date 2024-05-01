@@ -29,6 +29,7 @@ Using [IDG protein family activity thresholds](https://druggablegenome.net/IDGPr
 - Ion Channels: <= 10μM
 - Non-IDG Family Targets: <= 1μM
 
+When multiple measurements for a target-pair are found, the one with the lowest concentration is selected. This intentionally biases the model toward sensitivity.
 
 # Example to predict in Python using the ONNX Runtime
 
