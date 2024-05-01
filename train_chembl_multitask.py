@@ -1,5 +1,4 @@
 from onnxruntime.quantization import quantize_dynamic
-import onnx
 import torch
 from torch import nn
 import torch.nn.functional as F
@@ -152,7 +151,7 @@ class ChEMBLMultiTask(pl.LightningModule):
 if __name__ == "__main__":
 
     # each task loss is weighted inversely proportional to its number of datapoints, borrowed from:
-    # from: http://www.bioinf.at/publications/2014/NIPS2014a.pdf
+    # from: http://www.datascienceassn.org/sites/default/files/Deep%20Learning%20as%20an%20Opportunity%20in%20Virtual%20Screening.pdf
     with tb.open_file(f"{PATH}/{DATA_FILE}", mode="r") as t_file:
         weights = t_file.root.weights[:]
 
