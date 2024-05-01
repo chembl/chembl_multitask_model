@@ -9,7 +9,7 @@ from tables.atom import ObjectAtom
 import json
 
 
-CHEMBL_VERSION = 33
+CHEMBL_VERSION = 34
 FP_SIZE = 1024
 RADIUS = 2
 # num of active and inactive different molecules needed to include a target
@@ -58,7 +58,7 @@ df.to_csv(f"chembl_{CHEMBL_VERSION}_activity_data.csv", index=False)
 
 # ----------------------------------------------------------------------------
 # Set to active/inactive by threshold
-#     Based on IDG protein families: https://druggablegenome.net/ProteinFam
+#     Using IDG protein family activity thresholds: https://druggablegenome.net/IDGProteinFamilies
 #         Kinases: <= 30nM
 #         GPCRs: <= 100nM
 #         Nuclear Receptors: <= 100nM
@@ -215,7 +215,7 @@ with tb.open_file(f"mt_data_{CHEMBL_VERSION}.h5", mode="w") as t_file:
 
     # save task weights
     # each task loss will be weighted inversely proportional to its number of data points
-    # from: http://www.bioinf.at/publications/2014/NIPS2014a.pdf
+    # from: http://www.datascienceassn.org/sites/default/files/Deep%20Learning%20as%20an%20Opportunity%20in%20Virtual%20Screening.pdf
     weights = []
     for col in mt_df.columns.values:
         c = mt_df[mt_df[col] >= 0.0].shape[0]

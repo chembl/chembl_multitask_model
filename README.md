@@ -1,9 +1,37 @@
 # ChEMBL Multitask Nerual Network model
 
+Small and fast target prediction model trained on a panel of targets using ChEMBL data. The model can be used in off-target prediction scenarios with large collections of compounds. 
+
 - Based on the blogpost: http://chembl.blogspot.com/2019/05/multi-task-neural-network-on-chembl.html
 - Model available in KNIME thanks to Greg Landrum: https://www.knime.com/blog/interactive-bioactivity-prediction-with-multitask-neural-networks
 
 The model is exported to the ONNX format so it can be used in any programming language able to generate fingerprints with RDKit
+
+# Data Extraction
+
+Activities in ChEMBL with the following requirements are extracted
+
+- activities.standard_units = 'nM'
+- activities.standard_type IN ('EC50', 'IC50', 'Ki', 'Kd', 'XC50', 'AC50', 'Potency')
+- activities.data_validity_comment IS NULL
+- activities.standard_relation IN ('=', '<')
+- activities.potential_duplicate = 0 AND assays.confidence_score >= 8
+- target_dictionary.target_type = 'SINGLE PROTEIN'
+
+Keeping targets
+
+- with at least 100 active and 100 inactive compounds
+- mentioned in at least 2 publications
+
+Using [IDG protein family activity thresholds](https://druggablegenome.net/IDGProteinFamilies)
+
+- Kinases: <= 30nM
+- GPCRs: <= 100nM
+- Nuclear Receptors: <= 100nM
+- Ion Channels: <= 10μM
+- Non-IDG Family Targets: <= 1μM
+
+When multiple measurements for a target-pair are found, the one with the lowest concentration is selected. This intentionally biases the model toward sensitivity.
 
 # Example to predict in Python using the ONNX Runtime
 
@@ -33,7 +61,7 @@ def format_preds(preds, targets):
     return np_preds
 
 # load the model
-ort_session = onnxruntime.InferenceSession("trained_models/chembl_33_model/chembl_33_multitask.onnx", providers=['CPUExecutionProvider'])
+ort_session = onnxruntime.InferenceSession("trained_models/chembl_34_model/chembl_34_multitask.onnx", providers=['CPUExecutionProvider'])
 
 # calculate the FPs
 smiles = 'CN(C)CCc1c[nH]c2ccc(C[C@H]3COC(=O)N3)cc12'
