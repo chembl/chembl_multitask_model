@@ -5,6 +5,31 @@
 
 The model is exported to the ONNX format so it can be used in any programming language able to generate fingerprints with RDKit
 
+# Data Extraction
+
+Activities in ChEMBL with the following requirements are extracted
+
+- activities.standard_units = 'nM'
+- activities.standard_type IN ('EC50', 'IC50', 'Ki', 'Kd', 'XC50', 'AC50', 'Potency')
+- activities.data_validity_comment IS NULL
+- activities.standard_relation IN ('=', '<')
+- activities.potential_duplicate = 0 AND assays.confidence_score >= 8
+- target_dictionary.target_type = 'SINGLE PROTEIN'
+
+Keeping targets
+
+- with at least 100 active and 100 inactive compounds
+- mentioned in at least 2 publications
+
+Using [IDG protein family activity thresholds](https://druggablegenome.net/IDGProteinFamilies)
+
+- Kinases: <= 30nM
+- GPCRs: <= 100nM
+- Nuclear Receptors: <= 100nM
+- Ion Channels: <= 10μM
+- Non-IDG Family Targets: <= 1μM
+
+
 # Example to predict in Python using the ONNX Runtime
 
 ```Python

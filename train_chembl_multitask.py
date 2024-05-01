@@ -20,7 +20,7 @@ from collections import Counter
 import json
 
 
-CHEMBL_VERSION = 33
+CHEMBL_VERSION = 34
 PATH = "."
 DATA_FILE = f"mt_data_{CHEMBL_VERSION}.h5"
 N_WORKERS = 6  # prefetches data in parallel to have batches ready for traning
@@ -126,7 +126,7 @@ class ChEMBLMultiTask(pl.LightningModule):
         mcc = matthews_corrcoef(y, y_hat)
         auc = roc_auc_score(y, y_hat_proba)
 
-        metrics =  {
+        metrics = {
             "test_acc": torch.tensor(acc),
             "test_sens": torch.tensor(sens),
             "test_spec": torch.tensor(spec),
@@ -147,6 +147,7 @@ class ChEMBLMultiTask(pl.LightningModule):
             counters.update(itemset.keys())
         metrics = {x: float(sums[x]) / counters[x] for x in sums.keys()}
         return metrics
+
 
 if __name__ == "__main__":
 
@@ -217,6 +218,6 @@ if __name__ == "__main__":
         output_names=output_names,
     )
 
-    model_fp32 = f"./chembl_{CHEMBL_VERSION}_multitask.onnx",
-    model_quant = f"./chembl_{CHEMBL_VERSION}_multitask_q8.onnx",
+    model_fp32 = f"./chembl_{CHEMBL_VERSION}_multitask.onnx"
+    model_quant = f"./chembl_{CHEMBL_VERSION}_multitask_q8.onnx"
     quantized_model = quantize_dynamic(model_fp32, model_quant)
