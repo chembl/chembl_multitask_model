@@ -51,7 +51,7 @@ def fetch_data(engine):
             - target_chembl_id: The ChEMBL ID for the target protein.
             - protein_class_desc: A description of the protein class for the target.
     """
-    # SQL query to fetch relevant activity and target data
+
     query = """
     SELECT
       activities.doc_id AS doc_id,
@@ -90,9 +90,7 @@ def fetch_data(engine):
       target_dictionary.target_type = 'SINGLE PROTEIN'
     """
 
-    # Execute the SQL query using the provided database engine
     with engine.connect() as conn:
-        # Fetch data into a pandas DataFrame using pyarrow for efficient type handling
         df = pd.read_sql(text(query), conn, dtype_backend="pyarrow")
 
     # Sort data by activity value (standard_value), molecule (molregno), and target (tid)
@@ -122,7 +120,7 @@ def set_active(row):
     """
     standard_value = row["standard_value"]
     protein_class = row["protein_class_desc"]
-    active = 0  # Default to inactive
+    active = 0
 
     if standard_value is not pd.NA:
         # General threshold for activity
@@ -194,16 +192,10 @@ def calc_fp(smiles, mfpgen):
     Returns:
         np.ndarray: A NumPy array representing the molecular fingerprint.
     """
-    # Convert the SMILES string into an RDKit molecule object
     mol = Chem.MolFromSmiles(smiles)
-
-    # Generate the fingerprint for the molecule
     fp = mfpgen.GetFingerprint(mol)
-
-    # Convert the fingerprint to a NumPy array
     a = np.zeros((0,), dtype=np.float32)
     Chem.DataStructs.ConvertToNumpyArray(fp, a)
-
     return a
 
 

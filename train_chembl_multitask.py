@@ -232,9 +232,9 @@ if __name__ == "__main__":
     with tb.open_file(f"{DATA_FILE}", mode="r") as t_file:
         # Assign weights to tasks inversely proportional to their sample size.
         # Reference: http://www.bioinf.at/publications/2014/NIPS2014a.pdf
-        weights = t_file.root.weights[:]  # Load task weights
-        fps = t_file.root.fps  # Load fingerprint data
-        fp_size = fps.shape[1]  # Get fingerprint vector size
+        weights = t_file.root.weights[:]
+        fps = t_file.root.fps
+        fp_size = fps.shape[1]
 
     # Initialize dataset and create indices for splitting
     dataset = ChEMBLDataset(f"{DATA_FILE}")
@@ -276,7 +276,7 @@ if __name__ == "__main__":
             all_metrics[metric].append(value)
 
     # Save metrics from all folds to a JSON file
-    with open(f"chembl_{CHEMBL_VERSION}_metrics", "w") as f:
+    with open(os.path.join(args.output_dir, f"chembl_{CHEMBL_VERSION}_metrics.json"), "w") as f:
         json.dump(all_metrics, f)
 
     # Visualize the distribution of metrics across folds
