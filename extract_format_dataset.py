@@ -7,6 +7,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.sql import text
 import tables as tb
 from tables.atom import ObjectAtom
+import json
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Process ChEMBL data for multitask learning.")
@@ -29,12 +30,12 @@ def parse_args():
         "--output_dir", type=str, default=".", help="Directory to save output files. Default: current directory"
     )
     parser.add_argument(
-        "--protein_families", nargs='+', choices=['kinase', 'gpcr', 'ion channel', 'nuclear receptor'], default=None,
-        help="Protein families to include in the data extraction. Options: kinase, gpcr, ion channel, nuclear receptor. Default: include all families."
+        "--protein_family", choices=['kinase', 'gpcr'], default=None,
+        help="Protein family to include in the data extraction. Options: kinase, gpcr. Default: include all families."
     )
     return parser.parse_args()
 
-def fetch_data(engine, protein_families):
+def fetch_data(engine, protein_family):
     """
     Fetch relevant biological activity data from the database.
 
@@ -84,20 +85,13 @@ def fetch_data(engine, protein_families):
       target_dictionary.target_type = 'SINGLE PROTEIN'
     """
 
-    if protein_families:
+    if protein_family:
         family_map = {
             'kinase': 'enzyme  kinase  protein kinase',
             'gpcr': 'membrane receptor  7tm',
-            'ion channel': 'ion channel',
-            'nuclear receptor': 'transcription factor  nuclear receptor'
         }
         # Construct family filter clause
-        family_conditions = " OR ".join([
-            f"protein_classification.protein_class_desc LIKE '%{family_map[family]}%'"
-            for family in protein_families
-        ])
-
-        query += f" AND ({family_conditions})"
+        query += f" AND protein_classification.protein_class_desc LIKE '%{family_map[protein_family]}%'"
     with engine.connect() as conn:
         df = pd.read_sql(text(query), conn, dtype_backend="pyarrow")
 
@@ -255,9 +249,8 @@ def save_to_h5(mt_df, descs, output_file):
         labs = t_file.create_carray(t_file.root, "labels", fatom, mt_df.values.shape, filters=filters)
         labs[:] = mt_df.values
 
-        # Calculate and save task weights
         # Each task's loss will be weighted inversely proportional to the number of data points for that task
-        # Reference: http://www.bioinf.at/publications/2014/NIPS2014a.pdf
+        # Reference: https://ml.jku.at/publications/2014/NIPS2014f.pdf
         weights = [1 / mt_df[mt_df[col] >= 0.0].shape[0] for col in mt_df.columns.values]
         weights = np.array(weights)
         ws = t_file.create_carray(t_file.root, "weights", fatom, weights.shape)
@@ -268,8 +261,8 @@ if __name__ == "__main__":
 
     engine = create_engine(f"sqlite:///chembl_{args.chembl_version}.db")
 
-    df = fetch_data(engine, args.protein_families)
-    pf_name = "_".join(args.protein_families) if args.protein_families else "all"
+    df = fetch_data(engine, args.protein_family)
+    pf_name = args.protein_family if args.protein_family else "all"
     df.to_csv(f"{args.output_dir}/chembl_{args.chembl_version}_{pf_name}_activity_data.csv", index=False)
 
     activities, t_keep = filter_targets(df, args.active_mols, args.inactive_mols)
@@ -289,3 +282,8 @@ if __name__ == "__main__":
     descs = np.asarray([calc_fp(smi, mfpgen) for smi in mt_df["canonical_smiles"]], dtype=np.float32)
 
     save_to_h5(mt_df, descs, f"{args.output_dir}/mt_data_{args.chembl_version}_{pf_name}.h5")
+
+    # Check that h5 file opens and save targets to a json file
+    with tb.open_file(f"{args.output_dir}/mt_data_{args.chembl_version}_{pf_name}.h5", mode="r") as t_file:
+        with open(f"{args.output_dir}/targets_{args.chembl_version}_{pf_name}.json", "w") as f:
+            json.dump(t_file.root.target_chembl_ids[:], f)

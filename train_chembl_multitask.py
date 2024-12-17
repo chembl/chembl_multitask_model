@@ -33,8 +33,6 @@ def parse_args():
     parser.add_argument('--max_epochs', type=int, default=3, help="Maximum number of epochs")
     # Directory for saving output files
     parser.add_argument('--output_dir', type=str, default='./', help="Directory to save results")
-    # Enable quantization for model size optimization
-    parser.add_argument('--quantize', action='store_true', help="Quantize the model after training")
     return parser.parse_args()
 
 # Dataset class to handle ChEMBL data stored in PyTables format
@@ -229,7 +227,7 @@ if __name__ == "__main__":
     # Load weights and fingerprint length from the dataset file
     with tb.open_file(f"{DATA_FILE}", mode="r") as t_file:
         # Assign weights to tasks inversely proportional to their sample size.
-        # Reference: http://www.bioinf.at/publications/2014/NIPS2014a.pdf
+        # Reference: https://ml.jku.at/publications/2014/NIPS2014f.pdf
         weights = t_file.root.weights[:]
         fps = t_file.root.fps
         fp_size = fps.shape[1]
@@ -307,8 +305,7 @@ if __name__ == "__main__":
         output_names=output_names,  # Names of output tensors
     )
 
-    # Optional: Quantize the ONNX model for optimized inference
-    if args.quantize:
-        model_fp32 = os.path.join(args.output_dir, f"chembl_{CHEMBL_VERSION}_multitask.onnx")  # Path to FP32 model
-        model_quant = os.path.join(args.output_dir, f"chembl_{CHEMBL_VERSION}_multitask_q8.onnx")  # Path to quantized model
-        quantized_model = quantize_dynamic(model_fp32, model_quant)  # Perform quantization
+    # Quantize the ONNX model for optimized inference
+    model_fp32 = os.path.join(args.output_dir, f"chembl_{CHEMBL_VERSION}_multitask.onnx")  # Path to FP32 model
+    model_quant = os.path.join(args.output_dir, f"chembl_{CHEMBL_VERSION}_multitask_q8.onnx")  # Path to quantized model
+    quantized_model = quantize_dynamic(model_fp32, model_quant)  # Perform quantization
