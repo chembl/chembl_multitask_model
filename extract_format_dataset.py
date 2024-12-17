@@ -28,9 +28,13 @@ def parse_args():
     parser.add_argument(
         "--output_dir", type=str, default=".", help="Directory to save output files. Default: current directory"
     )
+    parser.add_argument(
+        "--protein_families", nargs='+', choices=['kinase', 'gpcr', 'ion channel', 'nuclear receptor'], default=None,
+        help="Protein families to include in the data extraction. Options: kinase, gpcr, ion channel, nuclear receptor. Default: include all families."
+    )
     return parser.parse_args()
 
-def fetch_data(engine):
+def fetch_data(engine, protein_families):
     """
     Fetch relevant biological activity data from the database.
 
@@ -62,7 +66,6 @@ def fetch_data(engine):
       target_dictionary.chembl_id AS target_chembl_id,
       protein_classification.protein_class_desc AS protein_class_desc
     FROM activities
-      -- Join activities with assay, molecule, and target metadata tables
       JOIN assays ON activities.assay_id = assays.assay_id
       JOIN target_dictionary ON assays.tid = target_dictionary.tid
       JOIN target_components ON target_dictionary.tid = target_components.tid
@@ -72,24 +75,29 @@ def fetch_data(engine):
       JOIN molecule_hierarchy ON molecule_dictionary.molregno = molecule_hierarchy.molregno
       JOIN compound_structures ON molecule_hierarchy.parent_molregno = compound_structures.molregno
     WHERE 
-      -- Filter for activity measurements in nanomolar (nM) units
       activities.standard_units = 'nM' AND
-      
-      -- Only include specific types of activity measurements
       activities.standard_type IN ('EC50', 'IC50', 'Ki', 'Kd', 'XC50', 'AC50', 'Potency') AND
-
-      -- Ensure data validity (no comments, duplicates, or uncertain data)
       activities.data_validity_comment IS NULL AND
       activities.standard_relation IN ('=', '<') AND
       activities.potential_duplicate = 0 AND
-
-      -- Include assays with a high confidence score (>= 8)
       assays.confidence_score >= 8 AND
-
-      -- Restrict to single-protein targets
       target_dictionary.target_type = 'SINGLE PROTEIN'
     """
 
+    if protein_families:
+        family_map = {
+            'kinase': 'enzyme  kinase  protein kinase',
+            'gpcr': 'membrane receptor  7tm',
+            'ion channel': 'ion channel',
+            'nuclear receptor': 'transcription factor  nuclear receptor'
+        }
+        # Construct family filter clause
+        family_conditions = " OR ".join([
+            f"protein_classification.protein_class_desc LIKE '%{family_map[family]}%'"
+            for family in protein_families
+        ])
+
+        query += f" AND ({family_conditions})"
     with engine.connect() as conn:
         df = pd.read_sql(text(query), conn, dtype_backend="pyarrow")
 
@@ -260,11 +268,12 @@ if __name__ == "__main__":
 
     engine = create_engine(f"sqlite:///chembl_{args.chembl_version}.db")
 
-    df = fetch_data(engine)
-    df.to_csv(f"{args.output_dir}/chembl_{args.chembl_version}_activity_data.csv", index=False)
+    df = fetch_data(engine, args.protein_families)
+    pf_name = "_".join(args.protein_families) if args.protein_families else "all"
+    df.to_csv(f"{args.output_dir}/chembl_{args.chembl_version}_{pf_name}_activity_data.csv", index=False)
 
     activities, t_keep = filter_targets(df, args.active_mols, args.inactive_mols)
-    activities.to_csv(f"{args.output_dir}/chembl_{args.chembl_version}_activity_data_filtered.csv", index=False)
+    activities.to_csv(f"{args.output_dir}/chembl_{args.chembl_version}_{pf_name}_activity_data_filtered.csv", index=False)
 
     mt_df = activities.pivot(index="molregno", columns="target_chembl_id", values="active")
     mt_df = mt_df.fillna(-1).reset_index()
@@ -274,9 +283,9 @@ if __name__ == "__main__":
     structs = structs[structs["canonical_smiles"].apply(lambda smi: Chem.MolFromSmiles(smi) is not None)]
 
     mt_df = pd.merge(structs, mt_df, how="inner", on="molregno")
-    mt_df.to_csv(f"{args.output_dir}/chembl_{args.chembl_version}_multi_task_data.csv", index=False)
+    mt_df.to_csv(f"{args.output_dir}/chembl_{args.chembl_version}_{pf_name}_multi_task_data.csv", index=False)
 
     mfpgen = rdFingerprintGenerator.GetMorganGenerator(radius=args.radius,fpSize=args.fp_size)
     descs = np.asarray([calc_fp(smi, mfpgen) for smi in mt_df["canonical_smiles"]], dtype=np.float32)
 
-    save_to_h5(mt_df, descs, f"{args.output_dir}/mt_data_{args.chembl_version}.h5")
+    save_to_h5(mt_df, descs, f"{args.output_dir}/mt_data_{args.chembl_version}_{pf_name}.h5")

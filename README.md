@@ -41,7 +41,7 @@ When multiple measurements for a target-pair are found, the one with the lowest 
 # Model training
 
 ```bash
-python train_chembl_multitask.py --chembl_version 35 --data_file ./output/mt_data_35.h5 --output_dir ./output/
+python train_chembl_multitask.py --chembl_version 35 --data_file ./output/mt_data_all_35.h5 --output_dir ./output/
 ```
 
 

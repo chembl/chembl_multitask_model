@@ -17,8 +17,6 @@ from sklearn.metrics import (
 )
 from sklearn.model_selection import KFold
 from collections import Counter
-import matplotlib.pyplot as plt
-import seaborn as sns
 import json
 
 
@@ -279,16 +277,6 @@ if __name__ == "__main__":
     with open(os.path.join(args.output_dir, f"chembl_{CHEMBL_VERSION}_metrics.json"), "w") as f:
         json.dump(all_metrics, f)
 
-    # Visualize the distribution of metrics across folds
-    for metric, values in all_metrics.items():
-        plt.figure(figsize=(8, 6))
-        sns.boxplot(data=values)  # Create a boxplot for the metric
-        plt.title(f"Distribution of {metric} across folds")
-        plt.ylabel(metric)
-        plt.xlabel('Fold')
-        plt.savefig(os.path.join(args.output_dir, f"{metric}_distribution.png"))  # Save plot
-        plt.close()
-
     # Train the model using the full dataset
     final_train_sampler = D.sampler.SubsetRandomSampler(indices)
     final_train_loader = DataLoader(
@@ -297,7 +285,7 @@ if __name__ == "__main__":
         num_workers=N_WORKERS,
         sampler=final_train_sampler,
     )
-    model = ChEMBLMultiTask(len(weights), weights)
+    model = ChEMBLMultiTask(len(weights), fp_size, weights)
 
     # Train the model with all available data
     trainer = pl.Trainer(max_epochs=args.max_epochs, accelerator="cpu")
