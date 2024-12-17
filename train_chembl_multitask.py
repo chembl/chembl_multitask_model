@@ -23,14 +23,15 @@ import json
 def parse_args():
     parser = argparse.ArgumentParser(description="Train and evaluate a multi-task model on ChEMBL data.")
     # Specify ChEMBL version to use
-    parser.add_argument('--chembl_version', type=int, required=True, help="ChEMBL version (no default)")
+    parser.add_argument('--chembl_version', type=int, required=True, help="ChEMBL version")
     # Path to the input dataset file
-    parser.add_argument('--data_file', type=str, required=True, help="Path to the data file (no default)")
+    parser.add_argument('--data_file', type=str, required=True, help="Path to the data file")
     # Define model training hyperparameters
-    parser.add_argument('--batch_size', type=int, default=32, help="Batch size")
-    parser.add_argument('--lr', type=float, default=4.0, help="Learning rate")
-    parser.add_argument('--n_workers', type=int, default=6, help="Number of workers for data loading")
+    parser.add_argument('--batch_size', type=int, default=32, help="Batch size") # https://twitter.com/ylecun/status/989610208497360896
+    parser.add_argument('--lr', type=float, default=4.0, help="Learning rate")  # Big value because of the way we are weighting the targets
     parser.add_argument('--max_epochs', type=int, default=3, help="Maximum number of epochs")
+    parser.add_argument('--n_workers', type=int, default=6, help="Number of workers for data loading")
+    parser.add_argument('--cv_folds', type=int, default=6, help="Number of K-Fold CV folds (0 to train model with whole dataset)")
     # Directory for saving output files
     parser.add_argument('--output_dir', type=str, default='./', help="Directory to save results")
     return parser.parse_args()
@@ -62,7 +63,7 @@ class ChEMBLMultiTask(pl.LightningModule):
     Supports flexible numbers of tasks with independent outputs for each target.
     """
 
-    def __init__(self, n_tasks, fp_size, weights=None):
+    def __init__(self, n_tasks, fp_size, lr, weights=None):
         """
         Initialize the multi-task model with independent output layers for each task.
 
@@ -78,6 +79,7 @@ class ChEMBLMultiTask(pl.LightningModule):
         self.fc2 = nn.Linear(2000, 100)     # Second fully connected layer
         self.dropout = nn.Dropout(0.25)    # Dropout layer for regularization
         self.test_step_outputs = []  # Store test step outputs for post-processing
+        self.lr = lr
 
         # Add an independent output layer for each task
         for n_m in range(n_tasks):
@@ -118,7 +120,7 @@ class ChEMBLMultiTask(pl.LightningModule):
         Returns:
             optimizer: Stochastic Gradient Descent optimizer.
         """
-        optimizer = torch.optim.SGD(self.parameters(), lr=LR)  # Use SGD with learning rate `LR`
+        optimizer = torch.optim.SGD(self.parameters(), lr=self.lr)  # Use SGD with learning rate `LR`
         return optimizer
 
     def training_step(self, batch, batch_idx):
@@ -215,17 +217,16 @@ class ChEMBLMultiTask(pl.LightningModule):
         return metrics
 
 if __name__ == "__main__":
-    # Parse command-line arguments
     args = parse_args()
 
-    CHEMBL_VERSION = args.chembl_version
-    DATA_FILE = args.data_file
-    BATCH_SIZE = args.batch_size
-    LR = args.lr
-    N_WORKERS = args.n_workers
+    chembl_version = args.chembl_version
+    data_file = args.data_file
+    batch_size = args.batch_size
+    n_workers = args.n_workers
+    lr = args.lr
 
     # Load weights and fingerprint length from the dataset file
-    with tb.open_file(f"{DATA_FILE}", mode="r") as t_file:
+    with tb.open_file(f"{data_file}", mode="r") as t_file:
         # Assign weights to tasks inversely proportional to their sample size.
         # Reference: https://ml.jku.at/publications/2014/NIPS2014f.pdf
         weights = t_file.root.weights[:]
@@ -233,72 +234,73 @@ if __name__ == "__main__":
         fp_size = fps.shape[1]
 
     # Initialize dataset and create indices for splitting
-    dataset = ChEMBLDataset(f"{DATA_FILE}")
+    dataset = ChEMBLDataset(f"{data_file}")
     indices = list(range(len(dataset)))
 
-    # Dictionary to store metrics for each fold
-    all_metrics = {
-        "test_acc": [], "test_sens": [], "test_spec": [], "test_prec": [], 
-        "test_f1": [], "test_mcc": [], "test_auc": []
-    }
+    if args.cv_folds:
+        # Dictionary to store metrics for each fold
+        all_metrics = {
+            "test_acc": [], "test_sens": [], "test_spec": [], "test_prec": [], 
+            "test_f1": [], "test_mcc": [], "test_auc": []
+        }
 
-    # Perform k-fold cross-validation
-    kfold = KFold(n_splits=5, shuffle=True)  # 5-fold CV with shuffling
-    for fold, (train_idx, test_idx) in enumerate(kfold.split(indices)):
-        # Create data samplers for training and testing
-        train_sampler = D.sampler.SubsetRandomSampler(train_idx)
-        test_sampler = D.sampler.SubsetRandomSampler(test_idx)
+        # Perform k-fold cross-validation
+        kfold = KFold(n_splits=5, shuffle=True)  # 5-fold CV with shuffling
+        for fold, (train_idx, test_idx) in enumerate(kfold.split(indices)):
+            # Create data samplers for training and testing
+            train_sampler = D.sampler.SubsetRandomSampler(train_idx)
+            test_sampler = D.sampler.SubsetRandomSampler(test_idx)
 
-        # Create data loaders for training and testing
-        train_loader = DataLoader(
-            dataset, batch_size=BATCH_SIZE, num_workers=N_WORKERS, sampler=train_sampler
-        )
-        test_loader = DataLoader(
-            dataset, batch_size=1000, num_workers=N_WORKERS, sampler=test_sampler
-        )
+            # Create data loaders for training and testing
+            train_loader = DataLoader(
+                dataset, batch_size=batch_size, num_workers=n_workers, sampler=train_sampler
+            )
+            test_loader = DataLoader(
+                dataset, batch_size=1000, num_workers=n_workers, sampler=test_sampler
+            )
 
-        # Initialize the multi-task model
-        model = ChEMBLMultiTask(len(weights), fp_size, weights)
+            # Initialize the multi-task model
+            model = ChEMBLMultiTask(len(weights), fp_size, lr, weights)
 
-        # Train the model using PyTorch Lightning
-        trainer = pl.Trainer(max_epochs=args.max_epochs, accelerator="cpu")
-        trainer.fit(model, train_dataloaders=train_loader)
+            # Train the model using PyTorch Lightning
+            trainer = pl.Trainer(max_epochs=args.max_epochs, accelerator="cpu")
+            trainer.fit(model, train_dataloaders=train_loader)
 
-        # Evaluate the model on the test set
-        mm = trainer.test(dataloaders=test_loader)
+            # Evaluate the model on the test set
+            mm = trainer.test(dataloaders=test_loader)
 
-        # Collect metrics for the current fold
-        for metric, value in mm[0].items():
-            all_metrics[metric].append(value)
+            # Collect metrics for the current fold
+            for metric, value in mm[0].items():
+                all_metrics[metric].append(value)
 
-    # Save metrics from all folds to a JSON file
-    with open(os.path.join(args.output_dir, f"chembl_{CHEMBL_VERSION}_metrics.json"), "w") as f:
-        json.dump(all_metrics, f)
+        # Save metrics from all folds to a JSON file
+        with open(os.path.join(args.output_dir, f"chembl_{chembl_version}_metrics.json"), "w") as f:
+            json.dump(all_metrics, f)
 
     # Train the model using the full dataset
     final_train_sampler = D.sampler.SubsetRandomSampler(indices)
     final_train_loader = DataLoader(
         dataset,
-        batch_size=BATCH_SIZE,
-        num_workers=N_WORKERS,
+        batch_size=batch_size,
+        num_workers=n_workers,
         sampler=final_train_sampler,
     )
-    model = ChEMBLMultiTask(len(weights), fp_size, weights)
+    model = ChEMBLMultiTask(len(weights), fp_size, lr, weights)
 
     # Train the model with all available data
     trainer = pl.Trainer(max_epochs=args.max_epochs, accelerator="cpu")
     trainer.fit(model, train_dataloaders=final_train_loader)
 
     # Extract target names from the dataset
-    with tb.open_file(f"{DATA_FILE}", mode="r") as t_file:
+    with tb.open_file(f"{data_file}", mode="r") as t_file:
         output_names = t_file.root.target_chembl_ids[:]
 
     # Save the trained model in PyTorch format
-    torch.save(model.state_dict(), os.path.join(args.output_dir, f"chembl_{CHEMBL_VERSION}_multitask.pth"))
+    torch.save(model.state_dict(), os.path.join(args.output_dir, f"chembl_{chembl_version}_multitask.pth"))
 
     # Save the trained model in ONNX format
     model.to_onnx(
-        os.path.join(args.output_dir, f"chembl_{CHEMBL_VERSION}_multitask.onnx"),
+        os.path.join(args.output_dir, f"chembl_{chembl_version}_multitask.onnx"),
         torch.ones(fp_size),  # Example input for the model
         export_params=True,  # Include model parameters
         input_names=["input"],  # Name of input tensor
@@ -306,6 +308,6 @@ if __name__ == "__main__":
     )
 
     # Quantize the ONNX model for optimized inference
-    model_fp32 = os.path.join(args.output_dir, f"chembl_{CHEMBL_VERSION}_multitask.onnx")  # Path to FP32 model
-    model_quant = os.path.join(args.output_dir, f"chembl_{CHEMBL_VERSION}_multitask_q8.onnx")  # Path to quantized model
+    model_fp32 = os.path.join(args.output_dir, f"chembl_{chembl_version}_multitask.onnx")  # Path to FP32 model
+    model_quant = os.path.join(args.output_dir, f"chembl_{chembl_version}_multitask_q8.onnx")  # Path to quantized model
     quantized_model = quantize_dynamic(model_fp32, model_quant)  # Perform quantization
