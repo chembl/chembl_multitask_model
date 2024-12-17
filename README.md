@@ -9,6 +9,10 @@ The model is exported to the ONNX format so it can be used in any programming la
 
 # Data Extraction
 
+```bash
+python extract_format_dataset.py --chembl_version 35 --output_dir ./chembl_35/
+```
+
 Activities in ChEMBL with the following requirements are extracted
 
 - activities.standard_units = 'nM'
@@ -32,6 +36,19 @@ Using [IDG protein family activity thresholds](https://druggablegenome.net/IDGPr
 - Non-IDG Family Targets: <= 1μM
 
 When multiple measurements for a target-pair are found, the one with the lowest concentration is selected. This intentionally biases the model toward sensitivity.
+
+
+# Model training
+
+```bash
+python train_chembl_multitask.py --chembl_version 35 --data_file ./chembl_35/mt_data_35_all.h5 --output_dir ./chembl_35/
+```
+
+# Extract Kinase data and train a Kinase specific model
+
+```bash
+python extract_format_dataset.py --chembl_version 35 --protein_family kinase --output_dir ./kinase/ && python train_chembl_multitask.py --chembl_version 35 --data_file ./kinase/mt_data_35_kinase.h5 --output_dir ./kinase/
+```
 
 # Example to predict in Python using the ONNX Runtime
 
