@@ -7,6 +7,10 @@ Small and fast target prediction model trained on a panel of targets using ChEMB
 
 The model is exported to the ONNX format so it can be used in any programming language able to generate fingerprints with RDKit
 
+# Try the model online!
+
+Using both RDKit Javascript MinimalLib and ONNX.js. Hosted in github pages: https://chembl.github.io/chembl_multitask_model
+
 # Data Extraction
 
 ```bash
@@ -128,7 +132,3 @@ res = sort(res, by=res->res[2], rev=true)
 # C++ REST microservice
 
 https://github.com/eloyfelix/pistache_predictor
-
-# Try it online!
-
-Using both RDKit Javascript MinimalLib and ONNX.js. Hosted in github pages: https://chembl.github.io/chembl_multitask_model
