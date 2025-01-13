@@ -1,4 +1,4 @@
-# ChEMBL Multitask Nerual Network model
+# ChEMBL Multitask Neural Network model
 
 Small and fast target prediction model trained on a panel of targets using ChEMBL data. The model can be used in off-target prediction scenarios with large collections of compounds. 
 
