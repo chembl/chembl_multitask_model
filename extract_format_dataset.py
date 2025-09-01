@@ -3,10 +3,10 @@ import numpy as np
 import pandas as pd
 from rdkit import Chem
 from rdkit.Chem import rdFingerprintGenerator
-from sqlalchemy import create_engine
-from sqlalchemy.sql import text
+from sqlalchemy import create_engine, text
 import tables as tb
 from tables.atom import ObjectAtom
+import chembl_downloader
 import json
 
 def parse_args():
@@ -259,7 +259,8 @@ def save_to_h5(mt_df, descs, output_file):
 if __name__ == "__main__":
     args = parse_args()
 
-    engine = create_engine(f"sqlite:///chembl_{args.chembl_version}.db")
+    path = chembl_downloader.download_extract_sqlite(version=str(args.chembl_version))
+    engine = create_engine(f"sqlite:///{path}")
 
     df = fetch_data(engine, args.protein_family)
     pf_name = args.protein_family if args.protein_family else "all"
