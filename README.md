@@ -14,7 +14,7 @@ Using both RDKit Javascript MinimalLib and ONNX.js. Hosted in github pages: http
 # Data Extraction
 
 ```bash
-python extract_format_dataset.py --chembl_version 35 --output_dir ./chembl_35/
+python extract_format_dataset.py --chembl_version 36 --output_dir ./chembl_36/
 ```
 
 Activities in ChEMBL with the following requirements are extracted
@@ -45,13 +45,13 @@ When multiple measurements for a target-pair are found, the one with the lowest 
 # Model training
 
 ```bash
-python train_chembl_multitask.py --chembl_version 35 --data_file ./chembl_35/mt_data_35_all.h5 --output_dir ./chembl_35/
+python train_chembl_multitask.py --chembl_version 36 --data_file ./chembl_36/mt_data_36_all.h5 --output_dir ./chembl_36/
 ```
 
 # Extract Kinase data and train a Kinase specific model
 
 ```bash
-python extract_format_dataset.py --chembl_version 35 --protein_family kinase --output_dir ./kinase/ && python train_chembl_multitask.py --chembl_version 35 --data_file ./kinase/mt_data_35_kinase.h5 --output_dir ./kinase/
+python extract_format_dataset.py --chembl_version 36 --protein_family kinase --output_dir ./kinase/ && python train_chembl_multitask.py --chembl_version 36 --data_file ./kinase/mt_data_36_kinase.h5 --output_dir ./kinase/
 ```
 
 # Example to predict in Python using the ONNX Runtime

@@ -253,10 +253,12 @@ if __name__ == "__main__":
 
             # Create data loaders for training and testing
             train_loader = DataLoader(
-                dataset, batch_size=batch_size, num_workers=n_workers, sampler=train_sampler
+                dataset, batch_size=batch_size, num_workers=n_workers, sampler=train_sampler,
+                persistent_workers=True if n_workers > 0 else False
             )
             test_loader = DataLoader(
-                dataset, batch_size=1000, num_workers=n_workers, sampler=test_sampler
+                dataset, batch_size=1000, num_workers=n_workers, sampler=test_sampler,
+                persistent_workers=True if n_workers > 0 else False
             )
 
             # Initialize the multi-task model
@@ -284,6 +286,7 @@ if __name__ == "__main__":
         batch_size=batch_size,
         num_workers=n_workers,
         sampler=final_train_sampler,
+        persistent_workers=True if n_workers > 0 else False,
     )
     model = ChEMBLMultiTask(len(weights), fp_size, lr, weights)
 
