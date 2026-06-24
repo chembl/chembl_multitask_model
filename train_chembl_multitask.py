@@ -1,6 +1,6 @@
 import argparse
 import os
-from onnxruntime.quantization import quantize_dynamic
+from onnxruntime.quantization import quantize_dynamic, quant_pre_process
 import torch
 from torch import nn
 import torch.nn.functional as F
@@ -312,5 +312,15 @@ if __name__ == "__main__":
 
     # Quantize the ONNX model for optimized inference
     model_fp32 = os.path.join(args.output_dir, f"chembl_{chembl_version}_multitask.onnx")  # Path to FP32 model
+    model_prep = os.path.join(args.output_dir, f"chembl_{chembl_version}_multitask_prepared.onnx")  # Path to pre-processed model
     model_quant = os.path.join(args.output_dir, f"chembl_{chembl_version}_multitask_q8.onnx")  # Path to quantized model
-    quantized_model = quantize_dynamic(model_fp32, model_quant)  # Perform quantization
+    
+    # Pre-process the model to add symbolic shape inference & optimization
+    quant_pre_process(model_fp32, model_prep)
+    
+    # Perform quantization on the pre-processed model
+    quantized_model = quantize_dynamic(model_prep, model_quant)
+    
+    # Clean up the pre-processed model file
+    if os.path.exists(model_prep):
+        os.remove(model_prep)

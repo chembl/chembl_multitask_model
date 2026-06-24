@@ -7,16 +7,22 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, minimal-ui">
 
     <!-- Vue 3 and Vuetify 3 latest CSS -->
-    <link href="https://cdn.jsdelivr.net/npm/vuetify@3.5.5/dist/vuetify.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/vuetify@3.7.15/dist/vuetify.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/@mdi/font@7.4.47/css/materialdesignicons.min.css" rel="stylesheet">
 
     <style>
         body {
             font-family: 'Roboto', sans-serif;
+            background-color: #f5f5f7;
         }
         .molecule-svg {
             max-width: 100%;
             height: auto;
+        }
+        .molecule-svg svg {
+            width: 100%;
+            height: auto;
+            max-height: 240px;
         }
     </style>
 </head>
@@ -24,10 +30,10 @@
     <div id="app"></div>
 
     <!-- External Scripts -->
-    <script src="https://cdn.jsdelivr.net/npm/vue@3.4.21/dist/vue.global.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/vuetify@3.5.5/dist/vuetify.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vue@3.5.13/dist/vue.global.prod.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vuetify@3.7.15/dist/vuetify.min.js"></script>
     <script src="https://unpkg.com/@rdkit/rdkit/Code/MinimalLib/dist/RDKit_minimal.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/ort.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.19.2/dist/ort.min.js"></script>
 
     <script>
         const { createApp, ref, onMounted, computed } = Vue;
@@ -43,8 +49,14 @@
             VBtn, 
             VCard, 
             VCardTitle, 
+            VCardText,
             VSpacer,
-            VDataTable
+            VDataTable,
+            VProgressLinear,
+            VAppBar,
+            VAppBarTitle,
+            VChip,
+            VIcon
         } = window.Vuetify;
 
         document.addEventListener('DOMContentLoaded', () => {
@@ -62,8 +74,14 @@
                         VBtn, 
                         VCard, 
                         VCardTitle, 
+                        VCardText,
                         VSpacer,
-                        VDataTable
+                        VDataTable,
+                        VProgressLinear,
+                        VAppBar,
+                        VAppBarTitle,
+                        VChip,
+                        VIcon
                     },
                     setup() {
                         const sortBy = ref([{ key: 'proba', order: 'desc' }]);
@@ -72,13 +90,13 @@
                         const smiles = ref('CN(Cc1cnc2nc(N)nc(N)c2n1)c1ccc(C(=O)N[C@@H](CCC(=O)[O-])C(=O)[O-])cc1');
                         const targets = ref([]);
                         const isLoading = ref(false);
-                        const selectedModel = ref('./chembl_35_multitask_q8.onnx');
+                        const selectedModel = ref('./chembl_37_multitask_q8.onnx');
                         const _predictTimeout = ref(null);
 
                         const models = [
-                            { title: 'Kinase', value: './chembl_35_multitask_kinase_q8.onnx' },
-                            { title: 'GPCR', value: './chembl_35_multitask_gpcr_q8.onnx' },
-                            { title: 'All Targets', value: './chembl_35_multitask_q8.onnx' }
+                            { title: 'Kinase', value: './chembl_37_multitask_kinase_q8.onnx' },
+                            { title: 'GPCR', value: './chembl_37_multitask_gpcr_q8.onnx' },
+                            { title: 'All Targets', value: './chembl_37_multitask_q8.onnx' }
                         ];
 
                         const headers = [
@@ -193,77 +211,142 @@
                         };
                     },
                     template: `
-                    <v-app>
+                    <v-app class="bg-grey-lighten-4">
+                        <v-app-bar color="indigo-darken-3" elevation="1">
+                            <v-app-bar-title class="font-weight-medium">
+                                <v-icon icon="mdi-flask" class="mr-2" style="color: #64B5F6;"></v-icon>
+                                <span class="font-weight-bold">ChEMBL</span> Target Predictor
+                            </v-app-bar-title>
+                            <v-spacer></v-spacer>
+                            <v-chip class="mr-2" color="white" variant="outlined" size="small" prepend-icon="mdi-flash">ONNX Web</v-chip>
+                            <v-chip class="mr-4" color="white" variant="outlined" size="small" prepend-icon="mdi-flask">RDKit JS</v-chip>
+                        </v-app-bar>
+
                         <v-main>
-                            <v-container fluid>
+                            <v-container fluid class="pa-4 pa-md-6">
                                 <v-row justify="center">
-                                    <v-col cols="12" md="8">
-                                        <h1 class="text-center mb-4">Multitask Target prediction with RDKit MinimalLib (JS) and ONNX.js</h1>
+                                    <!-- Inputs & Visualization -->
+                                    <v-col cols="12" lg="4" md="5">
+                                        <v-card class="mb-4 rounded-lg" elevation="2">
+                                            <v-card-title class="bg-indigo-lighten-5 text-indigo-darken-3 pt-3 pb-3">
+                                                <span class="text-subtitle-1 font-weight-bold">Compound Input & Structure</span>
+                                            </v-card-title>
+                                            <v-card-text class="pt-4">
+                                                <!-- Model Selection & SMILES -->
+                                                <v-row class="mt-1">
+                                                    <v-col cols="12" class="py-1">
+                                                        <v-select 
+                                                            v-model="selectedModel" 
+                                                            :items="models" 
+                                                            label="Select Predictor Model" 
+                                                            variant="outlined"
+                                                            density="comfortable"
+                                                            hide-details
+                                                            @update:model-value="predict">
+                                                        </v-select>
+                                                    </v-col>
+                                                    <v-col cols="12" class="py-1">
+                                                        <v-text-field 
+                                                            v-model="smiles" 
+                                                            label="Enter Molecular SMILES" 
+                                                            variant="outlined" 
+                                                            density="comfortable"
+                                                            @input="debouncedPredict"
+                                                            :error-messages="smileErrors" 
+                                                            :loading="isLoading"
+                                                            clearable
+                                                            hide-details="auto">
+                                                        </v-text-field>
+                                                    </v-col>
+                                                </v-row>
 
-                                        <!-- Molecule Visualization -->
-                                        <div v-if="molSVG" class="text-center mb-4">
-                                            <div v-html="molSVG" class="molecule-svg"></div>
-                                        </div>
+                                                <!-- Molecule Visualization -->
+                                                <div class="text-center mt-4 border rounded bg-white pa-2 d-flex align-center justify-center" style="min-height: 250px;">
+                                                    <div v-if="molSVG" v-html="molSVG" class="molecule-svg"></div>
+                                                    <div v-else class="text-grey-darken-1 text-body-2">
+                                                        Enter a valid SMILES above to draw 2D structure
+                                                    </div>
+                                                </div>
+                                            </v-card-text>
+                                            <v-card-actions class="px-4 pb-4">
+                                                <v-btn 
+                                                    :disabled="!targets.length"
+                                                    color="indigo-darken-3" 
+                                                    variant="elevated" 
+                                                    prepend-icon="mdi-download"
+                                                    class="w-100 py-3"
+                                                    @click="downloadResults">
+                                                    Download Predictions (CSV)
+                                                </v-btn>
+                                            </v-card-actions>
+                                        </v-card>
+                                    </v-col>
 
-                                        <!-- Model Selection and SMILES Input in Same Row -->
-                                        <v-row>
-                                            <v-col cols="3">
-                                                <v-select 
-                                                    v-model="selectedModel" 
-                                                    :items="models" 
-                                                    label="Select Model" 
-                                                    variant="outlined"
-                                                    @update:model-value="predict">
-                                                </v-select>
-                                            </v-col>
-                                            <v-col cols="9">
-                                                <v-text-field 
-                                                    v-model="smiles" 
-                                                    label="Enter SMILES" 
-                                                    variant="outlined" 
-                                                    @input="debouncedPredict"
-                                                    :error-messages="smileErrors" 
-                                                    :loading="isLoading">
-                                                </v-text-field>
-                                            </v-col>
-                                        </v-row>
+                                    <!-- Predictions Table -->
+                                    <v-col cols="12" lg="8" md="7">
+                                        <v-card class="rounded-lg position-relative" elevation="2" style="min-height: 400px;">
+                                            <v-progress-linear 
+                                                indeterminate 
+                                                color="indigo" 
+                                                :active="isLoading" 
+                                                class="position-absolute" 
+                                                style="top: 0; left: 0; right: 0; z-index: 1">
+                                            </v-progress-linear>
 
-                                        <!-- Download Button -->
-                                        <v-card-actions>
-                                            <v-spacer></v-spacer>
-                                            <v-btn color="primary" @click="downloadResults">Download Results</v-btn>
-                                        </v-card-actions>
-
-                                        <!-- Predictions Table -->
-                                        <v-card v-if="targets.length">
-                                            <v-card-title>
-                                                Predictions
+                                            <v-card-title class="bg-indigo-lighten-5 text-indigo-darken-3 pt-3 pb-3 d-flex align-center flex-wrap gap-2">
+                                                <span class="text-subtitle-1 font-weight-bold">Target Predictions</span>
                                                 <v-spacer></v-spacer>
                                                 <v-text-field 
                                                     v-model="search" 
-                                                    append-icon="mdi-magnify" 
-                                                    label="Search Targets"
+                                                    prepend-inner-icon="mdi-magnify" 
+                                                    label="Filter targets..."
+                                                    variant="solo"
+                                                    density="compact"
                                                     single-line 
-                                                    hide-details>
+                                                    hide-details
+                                                    flat
+                                                    style="max-width: 220px; min-width: 150px;">
                                                 </v-text-field>
                                             </v-card-title>
 
                                             <v-data-table
+                                                v-if="targets.length"
                                                 :headers="headers"
                                                 :items="targets"
                                                 :search="search"
                                                 item-key="chemblid"
                                                 :sort-by="sortBy"
-                                                class="elevation-1">
+                                                density="compact"
+                                                class="elevation-0">
                                                 
                                                 <template v-slot:item.chemblid="{ item }">
                                                     <a :href="\`https://www.ebi.ac.uk/chembl/target_report_card/\${item.chemblid}\`"
                                                         target="_blank" 
-                                                        style="text-decoration: none; color: #1976D2;">
+                                                        style="text-decoration: none;"
+                                                        class="text-indigo-darken-2 font-weight-bold d-inline-flex align-center">
+                                                        <v-icon size="small" class="mr-1">mdi-open-in-new</v-icon>
                                                         {{ item.chemblid }}
                                                     </a>
                                                 </template>
+
+                                                <template v-slot:item.proba="{ item }">
+                                                    <div class="d-flex align-center py-1">
+                                                        <span class="mr-3 font-weight-bold text-caption text-right" style="width: 48px;">{{ (item.proba * 100).toFixed(1) }}%</span>
+                                                        <v-progress-linear
+                                                            :model-value="item.proba * 100"
+                                                            :color="item.proba >= 0.75 ? 'success' : (item.proba >= 0.4 ? 'warning' : 'blue-grey-lighten-1')"
+                                                            height="6"
+                                                            rounded
+                                                        ></v-progress-linear>
+                                                    </div>
+                                                </template>
                                             </v-data-table>
+
+                                            <div v-else class="d-flex flex-column align-center justify-center text-grey-darken-1 py-12" style="min-height: 350px;">
+                                                <v-icon size="large" class="mb-2 text-grey-lighten-1" style="font-size: 48px;">mdi-flask-outline</v-icon>
+                                                <div class="text-body-1 font-weight-medium">No Predictions Loaded</div>
+                                                <div class="text-caption">Enter a valid SMILES string above to run screening</div>
+                                            </div>
                                         </v-card>
                                     </v-col>
                                 </v-row>
